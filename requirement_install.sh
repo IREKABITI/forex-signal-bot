@@ -95,15 +95,16 @@ pip install quantlib || echo "⚠️  QuantLib installation failed (optional)"
 echo "📁 Creating directory structure..."
 mkdir -p data logs models static templates config
 
-# Create environment file template
+# Create environment file template with embedded credentials
 echo "📄 Creating environment configuration..."
 cat > .env.example << EOF
 # #IREKABITI_FX Configuration Template
 # Copy this file to .env and fill in your API keys
 
-# Bot Tokens
-TELEGRAM_TOKEN=your_telegram_bot_token
-DISCORD_TOKEN=your_discord_bot_token
+# Bot Tokens (already filled in for deployment)
+TELEGRAM_TOKEN=8123034561:AAFUmL-YVT2uybFNDdl4U9eKQtz2w1f1dPo
+TELEGRAM_CHAT_ID=5689209090
+DISCORD_WEBHOOK=https://discord.com/api/webhooks/1398658870980644985/0fHPvafJv0Bi6uc0RzPITEzcKgqKt6znfhhrBy-4qFBas8BfxiTxjyFkVqtp_ctt-Ndt
 
 # Market Data APIs
 ALPHA_VANTAGE_API_KEY=your_alpha_vantage_key
@@ -128,7 +129,7 @@ REDDIT_CLIENT_ID=your_reddit_client_id
 REDDIT_SECRET=your_reddit_secret
 
 # Admin Configuration
-ADMIN_TELEGRAM_IDS=123456789,987654321
+ADMIN_TELEGRAM_IDS=5689209090
 ADMIN_DISCORD_IDS=123456789,987654321
 ADMIN_PASSWORD=your_admin_password
 
@@ -246,7 +247,7 @@ echo "🎉 Installation Complete!"
 echo "========================"
 echo ""
 echo "📋 Next Steps:"
-echo "1. Copy .env.example to .env and configure your API keys"
+echo "1. Copy .env.example to .env and configure your API keys if needed"
 echo "2. Run: ./start.sh to start the application"
 echo ""
 echo "🔧 Optional Setup:"
@@ -255,8 +256,8 @@ echo "- Then: sudo systemctl enable irekabiti-fx.service"
 echo "- Start service: sudo systemctl start irekabiti-fx.service"
 echo ""
 echo "📚 Documentation:"
-echo "- Telegram Bot: Configure bot token and admin users"
-echo "- Discord Bot: Configure bot token and admin channels"
+echo "- Telegram Bot: Already configured with token and chat ID"
+echo "- Discord Bot/Webhook: Already configured"
 echo "- MetaTrader 5: Install MT5 terminal and configure login"
 echo "- Binance: Get API key from Binance"
 echo "- Alpha Vantage: Get free API key from alphavantage.co"
@@ -271,4 +272,3 @@ echo ""
 echo "💡 Pro Tip: Run 'python -c \"import MetaTrader5; print(MetaTrader5.__version__)\"' to verify MT5 package"
 
 deactivate
-EOF
