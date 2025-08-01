@@ -91,6 +91,10 @@ pip install pytest pytest-asyncio black flake8
 echo "💰 Installing additional financial packages..."
 pip install quantlib || echo "⚠️  QuantLib installation failed (optional)"
 
+# Ensure uvicorn is installed (fix for container error)
+echo "⚡ Ensuring uvicorn is installed and available..."
+pip install uvicorn --force-reinstall
+
 # Create necessary directories
 echo "📁 Creating directory structure..."
 mkdir -p data logs models static templates config
