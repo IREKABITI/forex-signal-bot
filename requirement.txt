@@ -1,6 +1,9 @@
+# Core web framework
 fastapi
 uvicorn
 python-multipart
+
+# Data science & ML
 numpy
 pandas
 scikit-learn
@@ -10,30 +13,50 @@ scipy
 matplotlib
 seaborn
 plotly
+
+# Technical analysis
 pandas-ta
+
+# Trading and market data
 MetaTrader5
 python-binance
 alpha-vantage
 yfinance
+
+# Bot frameworks
 python-telegram-bot
 discord.py
+
+# Sentiment analysis / NLP
 tweepy
 praw
 nltk
 textblob
+
+# News and data sources
 newsapi-python
+
+# Database & async
 aiosqlite
 sqlalchemy
 alembic
+
+# Web and API utils
 aiohttp
 requests
+
+# Scheduling
 schedule
 apscheduler
+
+# Utilities
 python-dotenv
 pydantic
 pyjwt
 pytz
 python-dateutil
+
+# Dev and testing (optional)
 pytest
 pytest-asyncio
 black
