@@ -1,22 +1,32 @@
-import aiohttp
-from utils.logger import setup_logger
+"""
+Discord Bot for #IREKABITI_FX
+"""
 
-logger = setup_logger()
+import requests
+import logging
 
+# === HARDCODED DISCORD WEBHOOK ===
 DISCORD_WEBHOOK_URL = "https://discord.com/api/webhooks/1398658870980644985/0fHPvafJv0Bi6uc0RzPITEzcKgqKt6znfhhrBy-4qFBas8BfxiTxjyFkVqtp_ctt-Ndt"
+
+logger = logging.getLogger(__name__)
+
 
 class DiscordBot:
     def __init__(self):
         self.webhook_url = DISCORD_WEBHOOK_URL
 
-    async def send_signal(self, message: str):
+    def send_message(self, content: str):
         try:
-            async with aiohttp.ClientSession() as session:
-                payload = {"content": message}
-                async with session.post(self.webhook_url, json=payload) as response:
-                    if response.status == 204:
-                        logger.info("📤 Discord signal sent")
-                    else:
-                        logger.error(f"❌ Discord error {response.status}: {await response.text()}")
+            response = requests.post(self.webhook_url, json={"content": content})
+            if response.status_code == 204:
+                logger.info("✅ Discord message sent successfully.")
+            else:
+                logger.error(f"❌ Discord error {response.status_code}: {response.text}")
         except Exception as e:
-            logger.error(f"❌ Failed to send Discord message: {e}")
+            logger.error(f"❌ Discord send error: {e}")
+
+
+# Optional: Standalone testing
+if __name__ == "__main__":
+    bot = DiscordBot()
+    bot.send_message("🚀 Test signal from #IREKABITI_FX")
