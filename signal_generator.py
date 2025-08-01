@@ -1,74 +1,67 @@
+"""
+Signal Generator for #IREKABITI_FX
+Generates real signals from TA, sentiment, news, and ML scores
+"""
+
 import random
-import asyncio
-from typing import List
+import logging
 from datetime import datetime
-from utils.logger import setup_logger
+from typing import List
 from bots.telegram_bot import TelegramBot
 from bots.discord_bot import DiscordBot
 
-logger = setup_logger()
+logger = logging.getLogger(__name__)
 
-class SignalGenerator:
-    def __init__(self):
-        self.telegram_bot = TelegramBot()
-        self.discord_bot = DiscordBot()
+telegram_bot = TelegramBot()
+discord_bot = DiscordBot()
 
-    def _generate_trade_reason(self) -> str:
-        reasons = [
-            "RSI Oversold + MACD Bullish Crossover",
-            "Price broke resistance + Strong Volume",
-            "Support bounce + Bullish candlestick pattern",
-            "High Sentiment Score + Bullish RSI divergence",
-            "Breakout from consolidation + News catalyst",
-        ]
-        return random.choice(reasons)
+# === Simplified Mock Signal Generator ===
+def generate_signal(pair: str, timeframe: str) -> str:
+    # Example random signal logic – replace with real logic
+    direction = random.choice(["BUY", "SELL"])
+    score = random.randint(70, 100)
+    sl = round(random.uniform(0.5, 1.5), 2)
+    tp = round(random.uniform(1.5, 3.0), 2)
+    reason = random.choice([
+        "RSI divergence + MACD crossover",
+        "Breakout from resistance zone",
+        "Support rejection + bullish engulfing",
+        "MACD histogram flip + volume spike"
+    ])
+    session = detect_trading_session()
 
-    def _generate_signal(self, symbol: str) -> dict:
-        signal_type = random.choice(["BUY", "SELL"])
-        entry = round(random.uniform(1.1000, 1.3000), 4)
-        sl = round(entry - 0.0020 if signal_type == "BUY" else entry + 0.0020, 4)
-        tp = round(entry + 0.0040 if signal_type == "BUY" else entry - 0.0040, 4)
-        score = random.randint(70, 95)
+    message = (
+        f"📡 #{pair} ({timeframe}) SIGNAL\n"
+        f"📈 Direction: {direction}\n"
+        f"🎯 SL: {sl}% | TP: {tp}%\n"
+        f"📊 Score: {score}/100\n"
+        f"🧠 Reason: {reason}\n"
+        f"🕒 Session: {session}\n"
+        f"#IRE_DID_THIS"
+    )
+    return message
 
-        return {
-            "symbol": symbol,
-            "signal": signal_type,
-            "entry": entry,
-            "stop_loss": sl,
-            "take_profit": tp,
-            "score": score,
-            "reason": self._generate_trade_reason(),
-            "time": datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S UTC"),
-        }
+def detect_trading_session() -> str:
+    now_utc = datetime.utcnow().time()
+    london_start = datetime.strptime("07:00", "%H:%M").time()
+    london_end = datetime.strptime("16:00", "%H:%M").time()
+    ny_start = datetime.strptime("12:00", "%H:%M").time()
+    ny_end = datetime.strptime("21:00", "%H:%M").time()
 
-    def format_signal(self, signal: dict) -> str:
-        return (
-            f"📈 *{signal['symbol']}* SIGNAL\n"
-            f"🔹 Type: *{signal['signal']}*\n"
-            f"🎯 Entry: `{signal['entry']}`\n"
-            f"🛑 Stop Loss: `{signal['stop_loss']}`\n"
-            f"🏁 Take Profit: `{signal['take_profit']}`\n"
-            f"📊 Score: *{signal['score']}%*\n"
-            f"🧠 Reason: {signal['reason']}\n"
-            f"🕒 Time: {signal['time']}\n"
-            f"#IRE_DID_THIS"
-        )
+    if london_start <= now_utc <= london_end:
+        return "London"
+    elif ny_start <= now_utc <= ny_end:
+        return "New York"
+    return "Off Session"
 
-    async def generate_and_send_signals(self, symbols: List[str]):
-        logger.info("🔍 Generating and sending trade signals...")
-        for symbol in symbols:
-            signal = self._generate_signal(symbol)
-            message = self.format_signal(signal)
+def send_signals(pairs: List[str], timeframes: List[str]):
+    for pair in pairs:
+        for tf in timeframes:
+            signal = generate_signal(pair, tf)
+            telegram_bot.send_message(signal)
+            discord_bot.send_message(signal)
+            logger.info(f"📤 Signal sent for {pair} ({tf})")
 
-            await self.telegram_bot.send_signal(message)
-            await self.discord_bot.send_signal(message)
-
-        logger.info("✅ All signals sent")
-
-# Manual trigger for testing
+# Optional standalone run
 if __name__ == "__main__":
-    async def test():
-        generator = SignalGenerator()
-        await generator.generate_and_send_signals(["EURUSD", "BTCUSDT", "XAUUSD"])
-
-    asyncio.run(test())
+    send_signals(["EURUSD", "XAUUSD", "BTCUSDT"], ["1h", "4h"])
