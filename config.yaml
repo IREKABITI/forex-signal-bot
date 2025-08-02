@@ -1,0 +1,21 @@
+# config.yaml
+
+assets:
+  - EURUSD
+  - GBPUSD
+  - XAUUSD
+
+scan_interval: 300  # in seconds
+
+min_score: 4  # Minimum score to trigger alerts
+
+sessions:
+  - London
+  - New_York
+
+auto_trade: false  # Toggle auto trading (for future MT5 integration)
+
+lot_size: 0.1
+
+stop_loss_pips: 20
+take_profit_pips: 40
