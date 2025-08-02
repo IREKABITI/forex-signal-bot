@@ -1,1 +1,1 @@
-web: bash install.sh
+web: pip install requests matplotlib && python main.py
