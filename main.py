@@ -2,13 +2,10 @@ import logging
 from signal_generator import generate_signal_with_ml
 from alert_manager import send_signal_alert
 
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s'
-)
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 def run_full_scan():
-    # Example assets and dummy feature inputs; replace with your actual data fetching logic
+    # Replace with your real data fetching and feature extraction
     assets = [
         {
             "asset": "EURUSD",
@@ -30,7 +27,6 @@ def run_full_scan():
             "sl": 144.50,
             "session": "NY"
         }
-        # Add more assets here as needed
     ]
 
     logging.info("🔍 Running full signal scan...")
@@ -48,8 +44,8 @@ def run_full_scan():
             "session": asset_data.get("session")
         }
 
-        if signal_data["final_confidence"] >= 0.5:  # Example threshold to send alerts
-            logging.info(f"✅ Sending alert for {signal_data['asset']} with confidence {signal_data['final_confidence']:.2f}")
+        if signal_data["final_confidence"] >= 0.5:  # Threshold for sending alerts
+            logging.info(f"✅ Sending alert for {signal_data['asset']} (Confidence: {signal_data['final_confidence']:.2f})")
             send_signal_alert(signal_data)
         else:
             logging.info(f"❌ Signal '{signal_data['asset']}' rejected due to low confidence ({signal_data['final_confidence']:.2f})")
