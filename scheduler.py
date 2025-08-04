@@ -1,19 +1,21 @@
-# scheduler.py
-import threading
+import schedule
+import time
 import logging
-from signal_generator import run_full_scan
+from main import run_full_scan
 
-def schedule_scans(interval_minutes=5):
-    """Schedules run_full_scan to run every interval_minutes."""
-    def run_periodically():
-        try:
-            logging.info(f"⏳ Running scheduled signal scan...")
-            run_full_scan()
-        except Exception as e:
-            logging.error(f"❌ Error during scheduled scan: {e}")
-        
-        # Schedule the next scan
-        threading.Timer(interval_minutes * 60, run_periodically).start()
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s'
+)
 
-    # Start the first scheduled run
-    run_periodically()
+def job():
+    logging.info("🕒 Scheduled task started: Running full signal scan...")
+    run_full_scan()
+
+if __name__ == "__main__":
+    logging.info("Scheduler started: running scan every 30 minutes.")
+    schedule.every(30).minutes.do(job)
+
+    while True:
+        schedule.run_pending()
+        time.sleep(1)
