@@ -1,49 +1,41 @@
-# signal_generator.py
-import logging
-from alert_manager import send_alerts
-from assets.gold_signal import generate_gold_signal_with_score
-from assets.eurusd_signal import generate_eurusd_signal_with_score
-from assets.usdjpy_signal import generate_usdjpy_signal_with_score
+import numpy as np
+import tensorflow as tf
+from sklearn.preprocessing import StandardScaler
+import pandas as pd
 
-# Minimum signal score to send alert (1 to 6)
-MIN_SIGNAL_SCORE = 3
+MODEL_PATH = "lstm_signal_model.h5"
 
-def run_full_scan():
-    logging.info("🔍 Running full signal scan...")
+# Load your trained model once (e.g., at module load)
+model = tf.keras.models.load_model(MODEL_PATH)
+scaler = None  # We'll load or fit scaler later
 
-    signals = []
+def load_scaler(X_train):
+    # Fit scaler on training data features
+    global scaler
+    scaler = StandardScaler()
+    scaler.fit(X_train)
 
-    # Get signal + score from each asset
-    gold_signal = generate_gold_signal_with_score()
-    eurusd_signal = generate_eurusd_signal_with_score()
-    usdjpy_signal = generate_usdjpy_signal_with_score()
+def get_ml_confidence(signal_features: dict) -> float:
+    """
+    Takes a dict of features (technical_score, sentiment_score, news_score, etc.)
+    Returns model confidence (probability of predicted class) as float between 0-1.
+    """
 
-    signals.extend([gold_signal, eurusd_signal, usdjpy_signal])
+    # Prepare input vector from features in correct order matching training data
+    feature_order = ['technical_score', 'sentiment_score', 'news_score', 'combined_confidence']
+    X = np.array([[signal_features.get(f, 0) for f in feature_order]])
 
-    # Process signals: filter, format, send alerts
-    for sig in signals:
-        if sig is None:
-            continue
+    # Scale features
+    if scaler is None:
+        raise RuntimeError("Scaler not loaded or fitted")
 
-        score = sig.get('score', 0)
-        signal_text = sig.get('signal', '')
-        asset = sig.get('asset', 'Unknown')
+    X_scaled = scaler.transform(X)
 
-        if score < MIN_SIGNAL_SCORE:
-            logging.info(f"❌ Signal '{asset}' rejected due to low score ({score})")
-            continue
+    # Reshape for LSTM input: (samples, timesteps, features)
+    X_input = X_scaled.reshape((X_scaled.shape[0], 1, X_scaled.shape[1]))
 
-        confidence = get_confidence_label(score)
-        message = f"🟢 {asset} {signal_text} ({score}/6 Confidence: {confidence})"
-        
-        logging.info(f"✅ Sending alert: {message}")
-        send_alerts(message)
+    # Predict probabilities
+    preds = model.predict(X_input)
+    confidence = np.max(preds[0])  # Max probability across classes
 
-
-def get_confidence_label(score):
-    if score <= 2:
-        return "Low"
-    elif score <= 4:
-        return "Medium"
-    else:
-        return "High"
+    return confidence
