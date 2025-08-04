@@ -1,3 +1,4 @@
+requests
 yfinance
 numpy
-TA-Lib
+ta
