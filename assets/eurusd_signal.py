@@ -12,7 +12,6 @@ def generate_eurusd_signal_with_score():
         print(f"⏳ Skipping {ASSET_NAME} - Off Hours")
         return None
 
-    # Indicator scores (0 or 1)
     rsi = get_rsi_score(ASSET_NAME)
     macd = get_macd_score(ASSET_NAME)
     candle = get_candle_score(ASSET_NAME)
