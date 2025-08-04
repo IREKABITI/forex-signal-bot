@@ -8,7 +8,7 @@ def get_rsi_score(asset):
     if data.empty or len(data) < 14:
         return 0
 
-    close = data['Close']
+    close = data['Close'].squeeze()
     rsi = ta.momentum.RSIIndicator(close, window=14).rsi()
     latest_rsi = rsi.iloc[-1]
 
@@ -20,7 +20,7 @@ def get_macd_score(asset):
     if data.empty or len(data) < 26:
         return 0
 
-    close = data['Close']
+    close = data['Close'].squeeze()
     macd_indicator = ta.trend.MACD(close)
     macd = macd_indicator.macd()
     signal = macd_indicator.macd_signal()
