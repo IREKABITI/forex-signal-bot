@@ -1,14 +1,7 @@
 import yfinance as yf
 import numpy as np
 import ta
-
-def get_ticker(asset):
-    mapping = {
-        "Gold": "GC=F",
-        "EURUSD": "EURUSD=X",
-        "USDJPY": "JPY=X",
-    }
-    return mapping.get(asset, "")
+from utils.helpers import get_ticker
 
 def get_rsi_score(asset):
     ticker = get_ticker(asset)
