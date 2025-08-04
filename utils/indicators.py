@@ -1,4 +1,3 @@
-# utils/indicators.py
 import yfinance as yf
 import numpy as np
 import ta
