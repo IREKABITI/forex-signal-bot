@@ -1,3 +1,7 @@
+import yfinance as yf
+import numpy as np
+from utils.helpers import get_ticker
+
 def get_volatility_score(asset):
     ticker = get_ticker(asset)
     data = yf.download(ticker, period="1mo", interval="1d")
@@ -15,5 +19,5 @@ def get_volatility_score(asset):
     ])
 
     atr = np.mean(tr)
-    threshold = 0.5  # Adjust threshold based on asset
+    threshold = 0.5
     return 1 if atr > threshold else 0
