@@ -47,7 +47,7 @@ def get_candle_score(asset):
 
 def get_news_score(asset):
     print(f"Checking news impact for {asset}")
-    return 1  # Stub value
+    return 1  # Placeholder stub
 
 def get_volatility_score(asset):
     ticker = get_ticker(asset)
@@ -66,5 +66,5 @@ def get_volatility_score(asset):
     ])
 
     atr = np.mean(tr)
-    threshold = 0.5  # Adjust threshold if needed
+    threshold = 0.5
     return 1 if atr > threshold else 0
