@@ -53,9 +53,12 @@ def get_volatility_score(asset):
     low = data['Low']
     close = data['Close']
 
-    tr = np.maximum(high[1:].values - low[1:].values,
-                    np.abs(high[1:].values - close[:-1].values),
-                    np.abs(low[1:].values - close[:-1].values))
+    tr = np.maximum.reduce([
+        high[1:].values - low[1:].values,
+        np.abs(high[1:].values - close[:-1].values),
+        np.abs(low[1:].values - close[:-1].values)
+    ])
+
     atr = np.mean(tr)
     threshold = 0.5  # Adjust threshold based on asset
     return 1 if atr > threshold else 0
