@@ -6,9 +6,11 @@ from tensorflow.keras.layers import LSTM, Dense, Dropout
 from tensorflow.keras.callbacks import EarlyStopping
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
+import joblib  # For saving/loading scaler
 
 DATA_CSV = "ml_training_data.csv"
 MODEL_PATH = "lstm_signal_model.h5"
+SCALER_PATH = "scaler.save"
 
 def load_data():
     df = pd.read_csv(DATA_CSV)
@@ -19,8 +21,8 @@ def load_data():
 def preprocess_data(X):
     scaler = StandardScaler()
     X_scaled = scaler.fit_transform(X)
+    joblib.dump(scaler, SCALER_PATH)  # Save scaler
     # LSTM expects 3D input: (samples, timesteps, features)
-    # Here we use timesteps=1 (single step sequence)
     X_reshaped = X_scaled.reshape((X_scaled.shape[0], 1, X_scaled.shape[1]))
     return X_reshaped, scaler
 
@@ -52,6 +54,7 @@ def train():
 
     model.save(MODEL_PATH)
     print(f"Model saved to {MODEL_PATH}")
+    print(f"Scaler saved to {SCALER_PATH}")
 
 if __name__ == "__main__":
     train()
