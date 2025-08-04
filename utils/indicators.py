@@ -10,7 +10,7 @@ def get_rsi_score(asset):
 
     close = data['Close'].squeeze()
     rsi = ta.momentum.RSIIndicator(close, window=14).rsi()
-    latest_rsi = rsi.iloc[-1]
+    latest_rsi = rsi.iloc[-1].item()
 
     return 1 if latest_rsi < 30 else 0
 
@@ -25,7 +25,12 @@ def get_macd_score(asset):
     macd = macd_indicator.macd()
     signal = macd_indicator.macd_signal()
 
-    if macd.iloc[-2] < signal.iloc[-2] and macd.iloc[-1] > signal.iloc[-1]:
+    macd_prev = macd.iloc[-2].item()
+    macd_now = macd.iloc[-1].item()
+    signal_prev = signal.iloc[-2].item()
+    signal_now = signal.iloc[-1].item()
+
+    if macd_prev < signal_prev and macd_now > signal_now:
         return 1
     return 0
 
@@ -35,8 +40,8 @@ def get_candle_score(asset):
     if data.empty:
         return 0
 
-    open_ = data['Open'].iloc[-1]
-    close = data['Close'].iloc[-1]
+    open_ = data['Open'].iloc[-1].item()
+    close = data['Close'].iloc[-1].item()
     return 1 if close > open_ else 0
 
 def get_news_score(asset):
