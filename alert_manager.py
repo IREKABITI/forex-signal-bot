@@ -1,68 +1,60 @@
 import requests
 import logging
 
-# Your Telegram and Discord credentials (hardcoded)
+# Your Telegram and Discord credentials embedded here
 TELEGRAM_TOKEN = "8123034561:AAFUmL-YVT2uybFNDdl4U9eKQtz2w1f1dPo"
 TELEGRAM_CHAT_ID = "5689209090"
-DISCORD_WEBHOOK = "https://discord.com/api/webhooks/1401965462941859871/rDJQ1XZU-qFtGuOf7b1fkXEMLICM1vCNjkhBtzZ0__yVpcBFrUH6NmWnrXihRdv3L-WZ"
+DISCORD_WEBHOOK_URL = "https://discord.com/api/webhooks/1401965462941859871/rDJQ1XZU-qFtGuOf7b1fkXEMLICM1vCNjkhBtzZ0__yVpcBFrUH6NmWnrXihRdv3L-WZ"
 
-def format_confidence_emoji(confidence: float) -> str:
-    if confidence >= 0.75:
-        return "🔥"  # High confidence
-    elif confidence >= 0.5:
-        return "⚡"  # Medium confidence
-    else:
-        return "⚠️"  # Low confidence
-
-def send_telegram_alert(message: str):
+def send_telegram_message(message: str):
     url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
-    payload = {
-        "chat_id": TELEGRAM_CHAT_ID,
-        "text": message,
-        "parse_mode": "Markdown"
-    }
+    payload = {"chat_id": TELEGRAM_CHAT_ID, "text": message, "parse_mode": "Markdown"}
     try:
         response = requests.post(url, data=payload)
-        response.raise_for_status()
-        logging.info("Telegram alert sent successfully.")
+        if response.status_code == 200:
+            logging.info("Telegram alert sent successfully.")
+        else:
+            logging.error(f"Failed to send Telegram alert: {response.text}")
     except Exception as e:
-        logging.error(f"Telegram alert failed: {e}")
+        logging.error(f"Telegram send error: {e}")
 
-def send_discord_alert(message: str):
+def send_discord_message(message: str):
     payload = {"content": message}
     try:
-        response = requests.post(DISCORD_WEBHOOK, json=payload)
-        response.raise_for_status()
-        logging.info("Discord alert sent successfully.")
+        response = requests.post(DISCORD_WEBHOOK_URL, json=payload)
+        if response.status_code == 204:
+            logging.info("Discord alert sent successfully.")
+        else:
+            logging.error(f"Failed to send Discord alert: {response.text}")
     except Exception as e:
-        logging.error(f"Discord alert failed: {e}")
+        logging.error(f"Discord send error: {e}")
 
 def send_signal_alert(signal_data: dict):
-    """
-    signal_data example:
-    {
-        "asset": "EURUSD",
-        "signal": "Buy",
-        "final_confidence": 0.82,
-        "ml_confidence": 0.9,
-        "base_confidence": 0.7,
-        "tp": 1.1050,
-        "sl": 1.0950,
-        "session": "London"
-    }
-    """
+    asset = signal_data.get("asset", "Unknown")
+    signal = signal_data.get("signal", "Hold")
+    confidence = signal_data.get("final_confidence", 0)
+    session = signal_data.get("session", "Unknown")
+    tp = signal_data.get("tp", "N/A")
+    sl = signal_data.get("sl", "N/A")
 
-    emoji = format_confidence_emoji(signal_data["final_confidence"])
-    conf_percent = int(signal_data["final_confidence"] * 100)
+    if confidence >= 0.75:
+        emoji = "🟢"
+        conf_level = "High"
+    elif confidence >= 0.5:
+        emoji = "🟡"
+        conf_level = "Medium"
+    else:
+        emoji = "🔴"
+        conf_level = "Low"
 
     message = (
-        f"{emoji} *{signal_data['asset']}* {signal_data['signal']} Signal\n"
-        f"Confidence: {conf_percent}%\n"
-        f"ML Confidence: {int(signal_data['ml_confidence']*100)}%\n"
-        f"Base Confidence: {int(signal_data['base_confidence']*100)}%\n"
-        f"TP: {signal_data.get('tp', 'N/A')}  SL: {signal_data.get('sl', 'N/A')}\n"
-        f"Session: {signal_data.get('session', 'Unknown')}"
+        f"{emoji} *{asset}* {signal} Signal\n"
+        f"Confidence: {confidence:.2f} ({conf_level})\n"
+        f"Session: {session}\n"
+        f"TP: {tp}\n"
+        f"SL: {sl}\n"
+        f"#IRE_DID_THIS"
     )
 
-    send_telegram_alert(message)
-    send_discord_alert(message)
+    send_telegram_message(message)
+    send_discord_message(message)
