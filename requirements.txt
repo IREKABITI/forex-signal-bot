@@ -2,3 +2,6 @@ requests
 yfinance
 numpy
 ta
+tensorflow
+pandas
+scikit-learn
