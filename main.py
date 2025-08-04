@@ -1,19 +1,28 @@
 # main.py
 import time
-from signal_generator import generate_signals
-from alert_manager import send_alerts
-from config import Config
+import logging
+from signal_generator import run_full_scan
+from scheduler import schedule_scans
 
-def main():
-    config = Config()
-    scan_interval = config.get('scan_interval', 300)  # seconds
-
-    while True:
-        signals = generate_signals(config)
-        for signal in signals:
-            if signal['score'] >= config.get('min_score', 4):
-                send_alerts(signal, config)
-        time.sleep(scan_interval)
+# Configure logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 if __name__ == "__main__":
-    main()
+    logging.info("🚀 Forex Signal Bot Started")
+
+    try:
+        # Run immediate scan
+        run_full_scan()
+
+        # Schedule scans every 5 minutes
+        schedule_scans(interval_minutes=5)
+
+        # Keep the bot running
+        while True:
+            time.sleep(1)
+
+    except KeyboardInterrupt:
+        logging.info("🛑 Bot stopped manually.")
+
+    except Exception as e:
+        logging.error(f"❌ Critical error: {e}")
