@@ -1,28 +1,32 @@
+# utils/indicators.py
 import yfinance as yf
-import talib
 import numpy as np
+import ta
 
 def get_rsi_score(asset):
-    # Fetch historical data for asset (assuming asset ticker for Yahoo Finance)
     ticker = get_ticker(asset)
     data = yf.download(ticker, period="1mo", interval="1d")
-    if data.empty:
+    if data.empty or len(data) < 14:
         return 0
-    close = data['Close'].values
-    rsi = talib.RSI(close, timeperiod=14)
-    latest_rsi = rsi[-1]
-    # Score 1 if RSI < 30 (oversold), else 0
+
+    close = data['Close']
+    rsi = ta.momentum.RSIIndicator(close, window=14).rsi()
+    latest_rsi = rsi.iloc[-1]
+
     return 1 if latest_rsi < 30 else 0
 
 def get_macd_score(asset):
     ticker = get_ticker(asset)
     data = yf.download(ticker, period="1mo", interval="1d")
-    if data.empty:
+    if data.empty or len(data) < 26:
         return 0
-    close = data['Close'].values
-    macd, signal, hist = talib.MACD(close, fastperiod=12, slowperiod=26, signalperiod=9)
-    # Score 1 if MACD crosses above signal line (bullish)
-    if macd[-2] < signal[-2] and macd[-1] > signal[-1]:
+
+    close = data['Close']
+    macd_indicator = ta.trend.MACD(close)
+    macd = macd_indicator.macd()
+    signal = macd_indicator.macd_signal()
+
+    if macd.iloc[-2] < signal.iloc[-2] and macd.iloc[-1] > signal.iloc[-1]:
         return 1
     return 0
 
@@ -31,33 +35,33 @@ def get_candle_score(asset):
     data = yf.download(ticker, period="5d", interval="1d")
     if data.empty:
         return 0
-    open_ = data['Open'].values[-1]
-    close = data['Close'].values[-1]
-    # Bullish candle (close > open)
+
+    open_ = data['Open'].iloc[-1]
+    close = data['Close'].iloc[-1]
     return 1 if close > open_ else 0
 
 def get_news_score(asset):
-    # Placeholder: integrate with real news API or sentiment analysis
-    # For now, always return 1 (neutral/good)
+    # Placeholder for news sentiment
     return 1
 
 def get_volatility_score(asset):
     ticker = get_ticker(asset)
     data = yf.download(ticker, period="1mo", interval="1d")
-    if data.empty:
+    if data.empty or len(data) < 2:
         return 0
-    high = data['High'].values
-    low = data['Low'].values
-    close = data['Close'].values
-    # Calculate average true range (ATR)
-    tr = np.maximum(high[1:] - low[1:], np.abs(high[1:] - close[:-1]), np.abs(low[1:] - close[:-1]))
+
+    high = data['High']
+    low = data['Low']
+    close = data['Close']
+
+    tr = np.maximum(high[1:].values - low[1:].values,
+                    np.abs(high[1:].values - close[:-1].values),
+                    np.abs(low[1:].values - close[:-1].values))
     atr = np.mean(tr)
-    # Score 1 if ATR is above threshold (indicating volatility)
-    threshold = 0.5  # Adjust per asset scale
+    threshold = 0.5  # Adjust threshold based on asset
     return 1 if atr > threshold else 0
 
 def get_ticker(asset):
-    # Map asset names to Yahoo Finance tickers
     mapping = {
         "Gold": "GC=F",
         "EURUSD": "EURUSD=X",
