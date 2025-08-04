@@ -1,7 +1,19 @@
-# utils/volatility.py
-
 def get_volatility_score(asset):
-    # Placeholder for volatility check
-    # Return 1 if volatility is within acceptable range, else 0
-    print(f"Checking volatility for {asset}")
-    return 1  # stub value
+    ticker = get_ticker(asset)
+    data = yf.download(ticker, period="1mo", interval="1d")
+    if data.empty or len(data) < 2:
+        return 0
+
+    high = data['High']
+    low = data['Low']
+    close = data['Close']
+
+    tr = np.maximum.reduce([
+        high[1:].values - low[1:].values,
+        np.abs(high[1:].values - close[:-1].values),
+        np.abs(low[1:].values - close[:-1].values)
+    ])
+
+    atr = np.mean(tr)
+    threshold = 0.5  # Adjust threshold based on asset
+    return 1 if atr > threshold else 0
