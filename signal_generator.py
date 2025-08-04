@@ -24,7 +24,7 @@ else:
 
 def get_ml_confidence(signal_features: dict) -> float:
     if model is None or scaler is None:
-        return 0.0  # ML disabled fallback
+        return 0.0
 
     feature_order = ['technical_score', 'sentiment_score', 'news_score', 'combined_confidence']
     try:
@@ -39,18 +39,9 @@ def get_ml_confidence(signal_features: dict) -> float:
         return 0.0
 
 def generate_signal_with_ml(input_data: dict):
-    """
-    input_data should contain keys:
-    - technical_score
-    - sentiment_score
-    - news_score
-    - combined_confidence
-    """
-
     base_confidence = input_data.get("combined_confidence", 0)
     ml_confidence = get_ml_confidence(input_data)
 
-    # Combine base confidence and ML confidence (weighted average)
     final_confidence = (base_confidence + ml_confidence * 6) / 7
 
     signal_label = "Buy" if final_confidence >= 0.6 else "Hold"
@@ -64,11 +55,3 @@ def generate_signal_with_ml(input_data: dict):
 
     logging.info(f"Generated signal for {input_data.get('asset', 'Unknown')}: {signal}")
     return signal
-
-if __name__ == "__main__":
-    # Example usage/test
-    example_input = {
-        "asset": "EURUSD",
-        "technical_score": 0.75,
-        "sentiment_score": 0.7,
-        "news_score": 0._
