@@ -5,7 +5,6 @@ from alert_manager import send_signal_alert
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 def run_full_scan():
-    # Replace with your real data fetching and feature extraction
     assets = [
         {
             "asset": "EURUSD",
@@ -44,7 +43,7 @@ def run_full_scan():
             "session": asset_data.get("session")
         }
 
-        if signal_data["final_confidence"] >= 0.5:  # Threshold for sending alerts
+        if signal_data["final_confidence"] >= 0.5:
             logging.info(f"✅ Sending alert for {signal_data['asset']} (Confidence: {signal_data['final_confidence']:.2f})")
             send_signal_alert(signal_data)
         else:
