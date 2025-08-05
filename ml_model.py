@@ -1,60 +1,30 @@
-import pandas as pd
+import logging
 import numpy as np
-import tensorflow as tf
-from tensorflow.keras.models import Sequential
-from tensorflow.keras.layers import LSTM, Dense, Dropout
-from tensorflow.keras.callbacks import EarlyStopping
-from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import StandardScaler
-import joblib  # For saving/loading scaler
+from tensorflow.keras.models import load_model
+from joblib import load
 
-DATA_CSV = "ml_training_data.csv"
-MODEL_PATH = "lstm_signal_model.h5"
-SCALER_PATH = "scaler.save"
+# Try loading ML model and scaler
+try:
+    model = load_model('lstm_signal_model.h5')
+    scaler = load('scaler.save')
+    logging.info("✅ ML model and scaler loaded successfully.")
+except Exception as e:
+    model = None
+    scaler = None
+    logging.warning(f"⚠️ ML model or scaler files not found, ML confidence disabled.")
 
-def load_data():
-    df = pd.read_csv(DATA_CSV)
-    X = df.drop(columns=['target']).values
-    y = df['target'].values
-    return X, y
-
-def preprocess_data(X):
-    scaler = StandardScaler()
-    X_scaled = scaler.fit_transform(X)
-    joblib.dump(scaler, SCALER_PATH)  # Save scaler
-    # LSTM expects 3D input: (samples, timesteps, features)
-    X_reshaped = X_scaled.reshape((X_scaled.shape[0], 1, X_scaled.shape[1]))
-    return X_reshaped, scaler
-
-def build_model(input_shape):
-    model = Sequential()
-    model.add(LSTM(64, input_shape=input_shape, return_sequences=False))
-    model.add(Dropout(0.2))
-    model.add(Dense(32, activation='relu'))
-    model.add(Dense(3, activation='softmax'))  # 3 classes: Buy, Sell, Hold
-    model.compile(optimizer='adam', loss='sparse_categorical_crossentropy', metrics=['accuracy'])
-    return model
-
-def train():
-    X, y = load_data()
-    X, scaler = preprocess_data(X)
-    X_train, X_val, y_train, y_val = train_test_split(X, y, test_size=0.2, random_state=42, stratify=y)
-
-    model = build_model((X.shape[1], X.shape[2]))
-
-    early_stop = EarlyStopping(monitor='val_loss', patience=5, restore_best_weights=True)
-
-    history = model.fit(
-        X_train, y_train,
-        validation_data=(X_val, y_val),
-        epochs=50,
-        batch_size=32,
-        callbacks=[early_stop]
-    )
-
-    model.save(MODEL_PATH)
-    print(f"Model saved to {MODEL_PATH}")
-    print(f"Scaler saved to {SCALER_PATH}")
-
-if __name__ == "__main__":
-    train()
+def get_ml_confidence_score(signal_data):
+    if not model or not scaler:
+        return 0.0  # fallback if model is missing
+    
+    try:
+        features = np.array([
+            signal_data.get('confidence', 0.5),
+            1 if signal_data.get('signal') == 'Buy' else -1 if signal_data.get('signal') == 'Sell' else 0
+        ]).reshape(1, -1)
+        scaled = scaler.transform(features)
+        confidence = model.predict(scaled)[0][0]
+        return round(float(confidence), 2)
+    except Exception as e:
+        logging.error(f"❌ ML prediction failed: {e}")
+        return 0.0
