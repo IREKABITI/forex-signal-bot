@@ -1,57 +1,47 @@
-import numpy as np
-import tensorflow as tf
-import joblib
 import logging
-import os
+from assets.gold_signal import generate_gold_signal_with_score
+from assets.eurusd_signal import generate_eurusd_signal_with_score
+from assets.usdjpy_signal import generate_usdjpy_signal_with_score
+from alert_manager import send_alerts
+from ml_model import get_ml_confidence_score
 
-MODEL_PATH = "lstm_signal_model.h5"
-SCALER_PATH = "scaler.save"
+# Confidence threshold to filter weak signals
+MIN_CONFIDENCE = 0.3
 
-logging.basicConfig(level=logging.INFO)
+def run_full_scan():
+    logging.info("🔍 Running full signal scan...")
+    
+    all_signals = []
 
-model = None
-scaler = None
+    # Gold Signal
+    gold_signal = generate_gold_signal_with_score()
+    gold_signal['ml_confidence'] = get_ml_confidence_score(gold_signal)
+    gold_signal['final_confidence'] = (gold_signal['confidence'] + gold_signal['ml_confidence']) / 2
+    if gold_signal['final_confidence'] >= MIN_CONFIDENCE:
+        all_signals.append(gold_signal)
+        logging.info(f"✅ Sending alert: {gold_signal}")
+    else:
+        logging.info(f"❌ Signal 'Gold' rejected due to low confidence ({gold_signal['final_confidence']:.2f})")
 
-if os.path.exists(MODEL_PATH) and os.path.exists(SCALER_PATH):
-    try:
-        model = tf.keras.models.load_model(MODEL_PATH)
-        scaler = joblib.load(SCALER_PATH)
-        logging.info("✅ ML model and scaler loaded successfully.")
-    except Exception as e:
-        logging.error(f"Failed to load ML model or scaler: {e}")
-else:
-    logging.warning("⚠️ ML model or scaler files not found, ML confidence disabled.")
+    # EURUSD Signal
+    eurusd_signal = generate_eurusd_signal_with_score()
+    eurusd_signal['ml_confidence'] = get_ml_confidence_score(eurusd_signal)
+    eurusd_signal['final_confidence'] = (eurusd_signal['confidence'] + eurusd_signal['ml_confidence']) / 2
+    if eurusd_signal['final_confidence'] >= MIN_CONFIDENCE:
+        all_signals.append(eurusd_signal)
+        logging.info(f"✅ Sending alert: {eurusd_signal}")
+    else:
+        logging.info(f"❌ Signal 'EURUSD' rejected due to low confidence ({eurusd_signal['final_confidence']:.2f})")
 
-def get_ml_confidence(signal_features: dict) -> float:
-    if model is None or scaler is None:
-        return 0.0
+    # USDJPY Signal
+    usdjpy_signal = generate_usdjpy_signal_with_score()
+    usdjpy_signal['ml_confidence'] = get_ml_confidence_score(usdjpy_signal)
+    usdjpy_signal['final_confidence'] = (usdjpy_signal['confidence'] + usdjpy_signal['ml_confidence']) / 2
+    if usdjpy_signal['final_confidence'] >= MIN_CONFIDENCE:
+        all_signals.append(usdjpy_signal)
+        logging.info(f"✅ Sending alert: {usdjpy_signal}")
+    else:
+        logging.info(f"❌ Signal 'USDJPY' rejected due to low confidence ({usdjpy_signal['final_confidence']:.2f})")
 
-    feature_order = ['technical_score', 'sentiment_score', 'news_score', 'combined_confidence']
-    try:
-        X = np.array([[signal_features.get(f, 0) for f in feature_order]])
-        X_scaled = scaler.transform(X)
-        X_input = X_scaled.reshape((X_scaled.shape[0], 1, X_scaled.shape[1]))
-        preds = model.predict(X_input)
-        confidence = float(np.max(preds[0]))
-        return confidence
-    except Exception as e:
-        logging.error(f"Error during ML prediction: {e}")
-        return 0.0
-
-def generate_signal_with_ml(input_data: dict):
-    base_confidence = input_data.get("combined_confidence", 0)
-    ml_confidence = get_ml_confidence(input_data)
-
-    final_confidence = (base_confidence + ml_confidence * 6) / 7
-
-    signal_label = "Buy" if final_confidence >= 0.6 else "Hold"
-
-    signal = {
-        "signal": signal_label,
-        "final_confidence": final_confidence,
-        "ml_confidence": ml_confidence,
-        "base_confidence": base_confidence,
-    }
-
-    logging.info(f"Generated signal for {input_data.get('asset', 'Unknown')}: {signal}")
-    return signal
+    if all_signals:
+        send_alerts(all_signals)
