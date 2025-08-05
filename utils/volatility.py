@@ -1,23 +1,22 @@
+# utils/volatility.py
 import yfinance as yf
 import numpy as np
-from utils.helpers import get_ticker
 
-def get_volatility_score(asset):
-    ticker = get_ticker(asset)
+def get_risk_reward_ratio(ticker):
     data = yf.download(ticker, period="1mo", interval="1d")
-    if data.empty or len(data) < 2:
-        return 0
+    close = data['Close'].values
+    atr = yf.download(ticker, period="1mo", interval="1d")['Close'].pct_change().std()
+    if atr == 0:
+        return 1.0
+    risk_reward = close[-1] / atr
+    return round(risk_reward, 2)
 
-    high = data['High']
-    low = data['Low']
-    close = data['Close']
-
-    tr = np.maximum.reduce([
-        high[1:].values - low[1:].values,
-        np.abs(high[1:].values - close[:-1].values),
-        np.abs(low[1:].values - close[:-1].values)
-    ])
-
-    atr = np.mean(tr)
-    threshold = 0.5
-    return 1 if atr > threshold else 0
+def get_volatility_score(ticker):
+    data = yf.download(ticker, period="1mo", interval="1d")
+    high = data['High'].values
+    low = data['Low'].values
+    close = data['Close'].values
+    atr = talib.ATR(high, low, close, timeperiod=14)[-1]
+    if atr > np.mean(atr):
+        return -1
+    return 1
