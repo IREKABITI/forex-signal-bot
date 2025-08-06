@@ -1,76 +1,74 @@
-# utils/volatility.py
-
 import yfinance as yf
 import numpy as np
 import logging
+import requests
 
-def get_atr(ticker, period=14):
-    """
-    Calculate Average True Range (ATR) for given ticker.
-    ATR is a measure of volatility.
-    """
-    try:
-        data = yf.download(ticker, period="1mo", interval="1d", progress=False)
-        high = data['High']
-        low = data['Low']
-        close = data['Close']
+# Telegram and Discord credentials
+TELEGRAM_TOKEN = '8123034561:AAFUmL-YVT2uybFNDdl4U9eKQtz2w1f1dPo'
+TELEGRAM_CHAT_ID = '5689209090'
+DISCORD_WEBHOOK_URL = 'https://discord.com/api/webhooks/1402201260857233470/mwzakXPNjf6S_BPG4ZbK_1MmtivoO2AZKtzYFTrVtAm-68X0MW2HJ1naKCD33Hh2E8Zp'
 
-        tr1 = high - low
-        tr2 = abs(high - close.shift(1))
-        tr3 = abs(low - close.shift(1))
-
-        tr = np.maximum(np.maximum(tr1, tr2), tr3)
-        atr = tr.rolling(window=period).mean().iloc[-1]
-        logging.info(f"📊 ATR({period}) for {ticker}: {atr}")
-        return atr
-    except Exception as e:
-        logging.error(f"❌ Failed to calculate ATR for {ticker}: {e}")
-        return None
+def calculate_atr(high, low, close, period=14):
+    tr_list = []
+    for i in range(1, len(close)):
+        tr = max(high[i] - low[i], abs(high[i] - close[i-1]), abs(low[i] - close[i-1]))
+        tr_list.append(tr)
+    atr = np.mean(tr_list[-period:])
+    return atr
 
 def get_volatility_score(ticker):
-    """
-    Returns a volatility score (1 to 3):
-    1 = Low Volatility
-    2 = Medium Volatility
-    3 = High Volatility
-    """
-    atr = get_atr(ticker)
-    if atr is None:
-        return 1  # Default low if error
-
-    # These thresholds can be tuned per asset class
-    if atr < 0.5:
-        score = 1
-    elif atr < 1.5:
-        score = 2
-    else:
-        score = 3
-
-    logging.info(f"⚡ Volatility score for {ticker}: {score}")
-    return score
-
-def calculate_risk_reward(entry_price, stop_loss, take_profit):
-    """
-    Calculate risk/reward ratio given entry, stop loss and take profit.
-    Returns ratio and classification emoji.
-    """
     try:
-        risk = abs(entry_price - stop_loss)
-        reward = abs(take_profit - entry_price)
-        if risk == 0:
-            logging.warning("⚠️ Risk is zero, invalid stop loss")
-            return None, "❌"
+        data = yf.download(ticker, period="1mo", interval="1d", auto_adjust=True)
+        if data.empty:
+            logging.warning(f"No data returned for ticker {ticker} in volatility.py")
+            return 0
 
-        ratio = reward / risk
-        if ratio >= 2:
-            emoji = "🟢"  # Good risk/reward
-        elif ratio >= 1:
-            emoji = "🟠"  # Acceptable risk/reward
+        high = data['High'].values
+        low = data['Low'].values
+        close = data['Close'].values
+
+        atr = calculate_atr(high, low, close)
+        avg_close = np.mean(close[-14:])
+        volatility = atr / avg_close if avg_close != 0 else 0
+
+        # Score interpretation:
+        # Low volatility: <0.01 = score 1
+        # Medium volatility: 0.01 - 0.02 = score 2
+        # High volatility: >0.02 = score 3
+        if volatility < 0.01:
+            score = 1
+        elif volatility < 0.02:
+            score = 2
         else:
-            emoji = "🔴"  # Poor risk/reward
+            score = 3
 
-        logging.info(f"⚖️ Risk/Reward ratio: {ratio:.2f} {emoji}")
-        return ratio, emoji
+        logging.info(f"Volatility for {ticker}: ATR={atr:.4f}, Volatility={volatility:.4f}, Score={score}")
+        return score
     except Exception as e:
-        logging.error(f"❌ Failed to calculate risk/reward: {e}")
-        return None, "❌"
+        logging.error(f"Error calculating volatility for {ticker}: {e}")
+        send_telegram_alert(f"⚠️ Error calculating volatility for {ticker}: {e}")
+        send_discord_alert(f"⚠️ Error calculating volatility for {ticker}: {e}")
+        return 0
+
+def send_telegram_alert(message):
+    try:
+        url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
+        payload = {'chat_id': TELEGRAM_CHAT_ID, 'text': message}
+        r = requests.post(url, json=payload)
+        if r.status_code == 200:
+            logging.info("Telegram volatility alert sent successfully.")
+        else:
+            logging.warning(f"Telegram volatility alert failed with status {r.status_code}.")
+    except Exception as e:
+        logging.error(f"Error sending Telegram volatility alert: {e}")
+
+def send_discord_alert(message):
+    try:
+        payload = {'content': message}
+        r = requests.post(DISCORD_WEBHOOK_URL, json=payload)
+        if r.status_code == 204:
+            logging.info("Discord volatility alert sent successfully.")
+        else:
+            logging.warning(f"Discord volatility alert failed with status {r.status_code}.")
+    except Exception as e:
+        logging.error(f"Error sending Discord volatility alert: {e}")
