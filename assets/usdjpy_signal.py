@@ -2,76 +2,70 @@
 
 import logging
 from utils.indicators import get_rsi_score, get_macd_score, get_candle_score, get_volatility_score
-from utils.session_filter import is_in_trading_session
-from utils.news_filter import check_news_impact
-from utils.volatility import calculate_risk_reward
 from alert_manager import send_alerts
 
-# Hardcoded credentials
-TELEGRAM_TOKEN = '8123034561:AAFUmL-YVT2uybFNDdl4U9eKQtz2w1f1dPo'
-TELEGRAM_CHAT_ID = '5689209090'
-DISCORD_WEBHOOK = 'https://discord.com/api/webhooks/1402201260857233470/mwzakXPNjf6S_BPG4ZbK_1MmtivoO2AZKtzYFTrVtAm-68X0MW2HJ1naKCD33Hh2E8Zp'
+# Your Telegram and Discord credentials (hardcoded)
+TELEGRAM_TOKEN = "8123034561:AAFUmL-YVT2uybFNDdl4U9eKQtz2w1f1dPo"
+TELEGRAM_CHAT_ID = "5689209090"
+DISCORD_WEBHOOK = "https://discord.com/api/webhooks/1402201260857233470/mwzakXPNjf6S_BPG4ZbK_1MmtivoO2AZKtzYFTrVtAm-68X0MW2HJ1naKCD33Hh2E8Zp"
 
-def generate_usdjpy_signal_with_score():
-    asset = "USDJPY"
-    ticker = "JPY=X"
+def generate_usdjpy_signal_with_score(data):
+    """
+    Generate USDJPY trading signal with confidence scoring.
+    Input:
+        data - price data DataFrame for USDJPY
+    Returns:
+        dict with signal info and score breakdown
+    """
 
-    logging.info(f"Checking news for {asset} ({ticker})")
-    news_score = check_news_impact(asset)
-    session_ok = is_in_trading_session()
+    # Calculate indicator scores
+    rsi_score = get_rsi_score(data, period=14)
+    macd_score = get_macd_score(data)
+    candle_score = get_candle_score(data)
+    volatility_score = get_volatility_score(data)
 
-    if not session_ok:
-        logging.info(f"⏸️ Market closed, skipping {asset}")
-        return None
+    # Combine scores - max 6 points total as example
+    total_score = rsi_score + macd_score + candle_score + volatility_score
 
-    # Indicator Scores
-    rsi = get_rsi_score(ticker)
-    macd = get_macd_score(ticker)
-    candle = get_candle_score(ticker)
-    volatility = get_volatility_score(ticker)
-    rr_ratio = calculate_risk_reward(ticker)
-
-    scores = [rsi, macd, candle, news_score, volatility]
-    total = sum(scores)
-    max_score = len(scores)
-    confidence = total / max_score
-
-    if total <= 2:
-        logging.info(f"❌ Signal '{asset}' rejected due to low score ({total})")
-        return None
-
-    if total >= 4:
-        signal = "Buy"
-        emoji = "🟢"
-    elif total <= -4:
-        signal = "Sell"
-        emoji = "🔴"
+    # Determine confidence level text
+    if total_score >= 5:
+        confidence = "High"
+    elif total_score >= 3:
+        confidence = "Medium"
     else:
-        signal = "Hold / No Clear Signal"
-        emoji = "🟡"
+        confidence = "Low"
 
-    if confidence >= 0.75:
-        level = "High"
-    elif confidence >= 0.5:
-        level = "Medium"
+    # Determine buy/sell/hold based on score and conditions
+    if total_score >= 4:
+        signal = "Buy" if rsi_score + macd_score > candle_score else "Sell"
     else:
-        level = "Low"
+        signal = "Hold"
 
-    alert_msg = (
-        f"{emoji} {asset} {signal} Signal ({total}/{max_score} Confidence: {level})\n"
-        f"📊 RSI: {rsi}, MACD: {macd}, Candle: {candle}, News: {news_score}, Volatility: {volatility}\n"
-        f"🎯 Risk/Reward Ratio: {rr_ratio:.2f}\n"
-        f"#IRE_DID_THIS"
-    )
-
-    logging.info(f"✅ Sending alert: {alert_msg}")
-    send_alerts(alert_msg, TELEGRAM_TOKEN, TELEGRAM_CHAT_ID, DISCORD_WEBHOOK)
-
-    return {
+    signal_data = {
+        "asset": "USDJPY",
         "signal": signal,
-        "score": total,
-        "confidence_level": level,
-        "components": {
-            "RSI": rsi, "MACD": macd, "Candle": candle, "News": news_score, "Volatility": volatility
+        "score": total_score,
+        "confidence": confidence,
+        "details": {
+            "RSI": rsi_score,
+            "MACD": macd_score,
+            "Candle": candle_score,
+            "Volatility": volatility_score,
         }
     }
+
+    # Prepare alert message
+    emoji = "🟢" if signal == "Buy" else "🔴" if signal == "Sell" else "⚪️"
+    alert_msg = (
+        f"{emoji} USDJPY {signal} Signal ({total_score}/6 Confidence: {confidence})\n"
+        f"Score Breakdown: RSI({rsi_score}), MACD({macd_score}), Candle({candle_score}), Volatility({volatility_score})"
+    )
+
+    # Send alerts
+    try:
+        send_alerts(alert_msg, TELEGRAM_TOKEN, TELEGRAM_CHAT_ID, DISCORD_WEBHOOK)
+        logging.info(f"✅ Sent alert: {alert_msg}")
+    except Exception as e:
+        logging.error(f"❌ Failed to send alert: {e}")
+
+    return signal_data
