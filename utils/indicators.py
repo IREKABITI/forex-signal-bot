@@ -1,77 +1,71 @@
-# utils/indicators.py
-
-import pandas as pd
 import yfinance as yf
-import ta  # technical analysis library
-import logging
+import pandas as pd
+import numpy as np
+import ta
 
-def download_data(ticker, period="1mo", interval="1d", auto_adjust=True):
-    """
-    Downloads OHLCV data using yfinance with auto_adjust=True (adjusted close).
-    """
-    try:
-        data = yf.download(ticker, period=period, interval=interval, auto_adjust=auto_adjust, progress=False)
-        return data
-    except Exception as e:
-        logging.error(f"Failed to download data for {ticker}: {e}")
-        return pd.DataFrame()
+def download_data(ticker, period="1mo", interval="1d"):
+    """Download historical price data."""
+    # auto_adjust=True by default in new yfinance versions
+    data = yf.download(ticker, period=period, interval=interval, progress=False)
+    if data.empty:
+        raise ValueError(f"No data for ticker {ticker}")
+    return data
 
 def get_rsi_score(ticker):
-    data = download_data(ticker, period="1mo", interval="1d")
-    if data.empty:
-        return 0
-
+    """Calculate RSI score (0-1 scale)."""
+    data = download_data(ticker)
     rsi = ta.momentum.RSIIndicator(data['Close']).rsi()
     latest_rsi = rsi.iloc[-1]
 
-    # Scoring logic: Strong buy if RSI < 30, strong sell if RSI > 70
+    # Score logic: RSI <30 oversold (bullish), >70 overbought (bearish)
     if latest_rsi < 30:
-        return 1  # bullish signal
+        return 1  # strong buy signal
     elif latest_rsi > 70:
-        return -1  # bearish signal
-    return 0
+        return 0  # strong sell signal
+    else:
+        return 0.5  # neutral
 
 def get_macd_score(ticker):
-    data = download_data(ticker, period="1mo", interval="1d")
-    if data.empty:
-        return 0
+    """Calculate MACD score."""
+    data = download_data(ticker)
+    macd = ta.trend.MACD(data['Close'])
+    macd_diff = macd.macd_diff()
+    latest_diff = macd_diff.iloc[-1]
 
-    macd_indicator = ta.trend.MACD(data['Close'])
-    macd = macd_indicator.macd()
-    signal = macd_indicator.macd_signal()
-
-    latest_macd = macd.iloc[-1]
-    latest_signal = signal.iloc[-1]
-
-    # Bullish if MACD crosses above signal line, bearish if below
-    if latest_macd > latest_signal:
+    # Score logic: positive diff = bullish, negative = bearish
+    if latest_diff > 0:
         return 1
-    elif latest_macd < latest_signal:
-        return -1
-    return 0
+    elif latest_diff < 0:
+        return 0
+    else:
+        return 0.5
 
 def get_candle_score(ticker):
-    data = download_data(ticker, period="5d", interval="1d")
-    if data.empty:
-        return 0
+    """Simple candle pattern score based on latest candle."""
+    data = download_data(ticker, period="5d")
+    candle = data.iloc[-1]
+    open_ = candle['Open']
+    close = candle['Close']
 
-    # Simple candlestick: bullish if close > open, bearish if close < open
-    last_candle = data.iloc[-1]
-    if last_candle['Close'] > last_candle['Open']:
+    # Bullish candle if close > open
+    if close > open_:
         return 1
-    elif last_candle['Close'] < last_candle['Open']:
-        return -1
-    return 0
+    elif close < open_:
+        return 0
+    else:
+        return 0.5
 
 def get_volatility_score(ticker):
-    data = download_data(ticker, period="1mo", interval="1d")
-    if data.empty:
-        return 0
-
+    """Calculate volatility score based on ATR normalized."""
+    data = download_data(ticker, period="1mo")
     atr = ta.volatility.AverageTrueRange(data['High'], data['Low'], data['Close']).average_true_range()
     latest_atr = atr.iloc[-1]
+    avg_atr = atr.mean()
 
-    # Higher ATR suggests higher volatility - score accordingly
-    if latest_atr > 0.02 * data['Close'].iloc[-1]:  # example threshold
+    # If current ATR higher than average => more volatile (score=1), else less (0)
+    if latest_atr > avg_atr:
         return 1
-    return 0
+    else:
+        return 0.5
+
+# Add more indicator scoring functions as needed
