@@ -1,56 +1,65 @@
 import os
+import tensorflow as tf
+import joblib
 import logging
 import numpy as np
-import pandas as pd
-from tensorflow.keras.models import load_model
-from sklearn.preprocessing import MinMaxScaler
-from data_prep import prepare_ml_features
 
+MODEL_PATH = 'lstm_signal_model.h5'
+SCALER_PATH = 'scaler.save'
+
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-MODEL_PATH = "lstm_signal_model.h5"
-SCALER_PATH = "scaler.pkl"
-
-model = None
-scaler = None
-
-def load_ml_model():
-    global model, scaler
+def load_model_and_scaler():
+    """
+    Load the ML model and scaler from disk.
+    Returns (model, scaler) or (None, None) if files not found.
+    """
+    model = None
+    scaler = None
     try:
         if os.path.exists(MODEL_PATH):
-            model = load_model(MODEL_PATH)
-            logger.info("✅ ML model loaded successfully.")
+            model = tf.keras.models.load_model(MODEL_PATH)
+            logger.info(f"Loaded ML model from {MODEL_PATH}")
         else:
-            logger.warning("⚠️ ML model not found.")
-
+            logger.warning(f"Model file {MODEL_PATH} not found.")
         if os.path.exists(SCALER_PATH):
-            import joblib
             scaler = joblib.load(SCALER_PATH)
-            logger.info("✅ Scaler loaded successfully.")
+            logger.info(f"Loaded scaler from {SCALER_PATH}")
         else:
-            logger.warning("⚠️ Scaler not found.")
+            logger.warning(f"Scaler file {SCALER_PATH} not found.")
     except Exception as e:
-        logger.error(f"❌ Failed to load ML model or scaler: {e}")
+        logger.error(f"Error loading model or scaler: {e}")
+    return model, scaler
 
-def predict_confidence(df: pd.DataFrame) -> float:
+def ml_predict_confidence(model, scaler, data):
     """
-    Predict confidence score using ML model (0 to 1).
+    Given model, scaler and input data, return ML confidence score.
+    Returns 0.0 if model/scaler not loaded or error occurs.
+    
+    Args:
+        model: TensorFlow model
+        scaler: Scikit-learn scaler
+        data: numpy array of features (1D or 2D)
+    
+    Returns:
+        float confidence score (0.0 to 1.0)
     """
-    global model, scaler
+    if model is None or scaler is None:
+        logger.warning("ML model or scaler not loaded, returning 0 confidence.")
+        return 0.0
+    
     try:
-        if model is None or scaler is None:
-            logger.warning("⚠️ ML model or scaler files not found, ML confidence disabled.")
-            return 0.0
-
-        features_df = prepare_ml_features(df)
-        if features_df.empty:
-            return 0.0
-
-        latest_features = features_df.tail(1).values
-        scaled_features = scaler.transform(latest_features)
-        prediction = model.predict(scaled_features)
-        confidence_score = float(np.clip(prediction[0][0], 0, 1))
-        return confidence_score
+        # Ensure data is 2D array for scaler
+        if len(data.shape) == 1:
+            data = data.reshape(1, -1)
+        data_scaled = scaler.transform(data)
+        pred = model.predict(data_scaled)
+        # Assume output is single scalar confidence, e.g. sigmoid output
+        confidence = float(pred[0][0])
+        # Clamp between 0 and 1
+        confidence = max(0.0, min(1.0, confidence))
+        return confidence
     except Exception as e:
-        logger.error(f"❌ ML confidence prediction failed: {e}")
+        logger.error(f"Error during ML prediction: {e}")
         return 0.0
