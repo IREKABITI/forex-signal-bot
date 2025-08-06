@@ -1,55 +1,70 @@
-# utils/session_filter.py
-
-from datetime import datetime, time, timezone, timedelta
+import datetime
+import pytz
 import logging
+import requests
+
+# Telegram and Discord credentials
+TELEGRAM_TOKEN = '8123034561:AAFUmL-YVT2uybFNDdl4U9eKQtz2w1f1dPo'
+TELEGRAM_CHAT_ID = '5689209090'
+DISCORD_WEBHOOK_URL = 'https://discord.com/api/webhooks/1402201260857233470/mwzakXPNjf6S_BPG4ZbK_1MmtivoO2AZKtzYFTrVtAm-68X0MW2HJ1naKCD33Hh2E8Zp'
+
+# Timezone info for sessions
+LONDON_TZ = pytz.timezone('Europe/London')
+NEW_YORK_TZ = pytz.timezone('America/New_York')
 
 def get_current_utc_time():
-    return datetime.utcnow().time()
+    return datetime.datetime.utcnow().replace(tzinfo=pytz.utc)
 
-def is_time_between(begin, end, current):
-    if begin < end:
-        return begin <= current < end
-    else:  # crosses midnight
-        return current >= begin or current < end
+def is_london_session():
+    now = get_current_utc_time().astimezone(LONDON_TZ)
+    start = now.replace(hour=8, minute=0, second=0, microsecond=0)
+    end = now.replace(hour=16, minute=0, second=0, microsecond=0)
+    in_session = start <= now <= end
+    logging.debug(f"London session check: {now} - {in_session}")
+    return in_session
 
-def get_trading_session():
-    """
-    Determines current trading session based on UTC time.
-    Returns session name and emoji.
-    Sessions (UTC times):
-      - Asian: 23:00 - 08:00
-      - London: 08:00 - 17:00
-      - New York: 13:00 - 22:00
-      - Off: otherwise
-    """
-    now = get_current_utc_time()
-    if is_time_between(time(23,0), time(8,0), now):
-        session = "Asian Session 🟣"
-        open_market = True
-    elif is_time_between(time(8,0), time(17,0), now):
-        session = "London Session 🟢"
-        open_market = True
-    elif is_time_between(time(13,0), time(22,0), now):
-        session = "New York Session 🔵"
-        open_market = True
+def is_new_york_session():
+    now = get_current_utc_time().astimezone(NEW_YORK_TZ)
+    start = now.replace(hour=8, minute=0, second=0, microsecond=0)
+    end = now.replace(hour=17, minute=0, second=0, microsecond=0)
+    in_session = start <= now <= end
+    logging.debug(f"New York session check: {now} - {in_session}")
+    return in_session
+
+def current_session():
+    if is_london_session():
+        return 'London'
+    elif is_new_york_session():
+        return 'New York'
     else:
-        session = "Off Session ⚪"
-        open_market = False
+        return 'Off-Session'
 
-    logging.info(f"⏰ Current trading session: {session}")
-    return session, open_market
+def notify_session_status():
+    session = current_session()
+    message = f"⏰ Current Trading Session: {session}"
+    send_telegram_alert(message)
+    send_discord_alert(message)
+    logging.info(message)
 
-def session_filter(min_session="London Session 🟢"):
-    """
-    Allows signal only if current session is in allowed sessions.
-    min_session can be set to "Asian", "London", or "New York" to allow those or later sessions.
-    """
-    session_order = ["Asian Session 🟣", "London Session 🟢", "New York Session 🔵", "Off Session ⚪"]
-    session, open_market = get_trading_session()
+def send_telegram_alert(message):
+    try:
+        url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
+        payload = {'chat_id': TELEGRAM_CHAT_ID, 'text': message}
+        r = requests.post(url, json=payload)
+        if r.status_code == 200:
+            logging.info("Telegram session alert sent successfully.")
+        else:
+            logging.warning(f"Telegram session alert failed with status {r.status_code}.")
+    except Exception as e:
+        logging.error(f"Error sending Telegram session alert: {e}")
 
-    if session_order.index(session) >= session_order.index(min_session):
-        logging.info(f"✅ Session filter passed: {session} >= {min_session}")
-        return True, session
-    else:
-        logging.warning(f"❌ Session filter failed: {session} < {min_session}")
-        return False, session
+def send_discord_alert(message):
+    try:
+        payload = {'content': message}
+        r = requests.post(DISCORD_WEBHOOK_URL, json=payload)
+        if r.status_code == 204:
+            logging.info("Discord session alert sent successfully.")
+        else:
+            logging.warning(f"Discord session alert failed with status {r.status_code}.")
+    except Exception as e:
+        logging.error(f"Error sending Discord session alert: {e}")
