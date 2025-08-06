@@ -1,7 +1,9 @@
-requests
-yfinance
-numpy
+numpy==1.24.4
 pandas
 pandas-ta
+yfinance
+requests
 tensorflow
 scikit-learn
+matplotlib
+python-dateutil
