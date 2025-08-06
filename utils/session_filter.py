@@ -8,43 +8,34 @@ TELEGRAM_TOKEN = '8123034561:AAFUmL-YVT2uybFNDdl4U9eKQtz2w1f1dPo'
 TELEGRAM_CHAT_ID = '5689209090'
 DISCORD_WEBHOOK_URL = 'https://discord.com/api/webhooks/1402201260857233470/mwzakXPNjf6S_BPG4ZbK_1MmtivoO2AZKtzYFTrVtAm-68X0MW2HJ1naKCD33Hh2E8Zp'
 
-# Timezone info for sessions
-LONDON_TZ = pytz.timezone('Europe/London')
-NEW_YORK_TZ = pytz.timezone('America/New_York')
+# Trading sessions in UTC
+SESSIONS = {
+    'London': (datetime.time(7, 0), datetime.time(16, 0)),
+    'New_York': (datetime.time(12, 0), datetime.time(21, 0)),
+    'Tokyo': (datetime.time(0, 0), datetime.time(9, 0)),
+    'Sydney': (datetime.time(22, 0), datetime.time(7, 0)),
+}
 
-def get_current_utc_time():
-    return datetime.datetime.utcnow().replace(tzinfo=pytz.utc)
+def get_current_session():
+    try:
+        now_utc = datetime.datetime.utcnow().time()
+        for session, (start, end) in SESSIONS.items():
+            if start < end:
+                if start <= now_utc < end:
+                    return session
+            else:  # Overnight session
+                if now_utc >= start or now_utc < end:
+                    return session
+        return 'Off_Session'
+    except Exception as e:
+        logging.error(f"Error determining current trading session: {e}")
+        send_telegram_alert(f"⚠️ Error determining current trading session: {e}")
+        send_discord_alert(f"⚠️ Error determining current trading session: {e}")
+        return 'Unknown'
 
-def is_london_session():
-    now = get_current_utc_time().astimezone(LONDON_TZ)
-    start = now.replace(hour=8, minute=0, second=0, microsecond=0)
-    end = now.replace(hour=16, minute=0, second=0, microsecond=0)
-    in_session = start <= now <= end
-    logging.debug(f"London session check: {now} - {in_session}")
-    return in_session
-
-def is_new_york_session():
-    now = get_current_utc_time().astimezone(NEW_YORK_TZ)
-    start = now.replace(hour=8, minute=0, second=0, microsecond=0)
-    end = now.replace(hour=17, minute=0, second=0, microsecond=0)
-    in_session = start <= now <= end
-    logging.debug(f"New York session check: {now} - {in_session}")
-    return in_session
-
-def current_session():
-    if is_london_session():
-        return 'London'
-    elif is_new_york_session():
-        return 'New York'
-    else:
-        return 'Off-Session'
-
-def notify_session_status():
-    session = current_session()
-    message = f"⏰ Current Trading Session: {session}"
-    send_telegram_alert(message)
-    send_discord_alert(message)
-    logging.info(message)
+def is_session_active(session_name):
+    current = get_current_session()
+    return current == session_name
 
 def send_telegram_alert(message):
     try:
