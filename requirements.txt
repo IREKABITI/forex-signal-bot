@@ -1,8 +1,8 @@
 requests
 yfinance
 numpy
-ta
-tensorflow
 pandas
+ta
 scikit-learn
-schedule
+tensorflow
+matplotlib
