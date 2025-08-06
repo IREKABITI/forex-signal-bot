@@ -1,10 +1,8 @@
 numpy==1.24.4
-pandas_ta==0.3.14b0
-pandas==1.5.3
-yfinance==0.2.18
+pandas==2.1.4
+pandas-ta==0.3.14b0
+yfinance==0.2.37
+matplotlib==3.8.2
 requests==2.31.0
-python-telegram-bot==20.3
-discord-webhook==0.7.0
-tensorflow==2.12.0
-scikit-learn==1.2.2
-matplotlib==3.7.1
+tensorflow==2.15.0
+scikit-learn==1.4.1
