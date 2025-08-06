@@ -1,62 +1,58 @@
-# signal_generator.py
 import logging
+import yfinance as yf
 from assets.eurusd_signal import generate_eurusd_signal_with_score
 from assets.usdjpy_signal import generate_usdjpy_signal_with_score
 from assets.gold_signal import generate_gold_signal_with_score
-from ml_model import load_model_and_scaler, ml_predict_confidence
 
-# Load ML model & scaler once
-model, scaler = load_model_and_scaler()
+# Setup logger
+logger = logging.getLogger()
+logger.setLevel(logging.INFO)
 
-# Threshold for accepting a signal (0.5 = 50% confidence)
-CONFIDENCE_THRESHOLD = 0.5
+def fetch_data(ticker, period='1mo', interval='1h'):
+    """
+    Fetch historical market data for a given ticker symbol.
+    """
+    try:
+        data = yf.download(ticker, period=period, interval=interval)
+        if data.empty:
+            logger.warning(f"No data fetched for {ticker}")
+            return None
+        return data
+    except Exception as e:
+        logger.error(f"Error fetching data for {ticker}: {e}")
+        return None
 
-def generate_signal_with_ml():
-    signals = []
-    for symbol, generator in [
-        ("EURUSD", generate_eurusd_signal_with_score),
-        ("USDJPY", generate_usdjpy_signal_with_score),
-        ("GOLD", generate_gold_signal_with_score),
-    ]:
+def run_full_scan():
+    """
+    Run signal generation for all assets.
+    """
+    signals = {}
+
+    # EURUSD
+    eurusd_data = fetch_data('EURUSD=X')
+    if eurusd_data is not None:
         try:
-            base_signal_data = generator()
-            base_confidence = base_signal_data["confidence"]
-            signal_type = base_signal_data["signal"]
-
-            # ML Confidence
-            if model and scaler:
-                ml_conf = ml_predict_confidence(symbol, model, scaler)
-            else:
-                ml_conf = 0.0
-
-            # Weighted final confidence
-            final_confidence = round((base_confidence + ml_conf) / 2, 2)
-
-            # Accept or reject based on confidence
-            if final_confidence >= CONFIDENCE_THRESHOLD:
-                msg = f"🟢 {symbol} {signal_type} Signal ({final_confidence*100:.0f}% Confidence)"
-                signals.append({
-                    "symbol": symbol,
-                    "signal": signal_type,
-                    "confidence": final_confidence,
-                    "ml_confidence": ml_conf,
-                    "base_confidence": base_confidence,
-                    "message": msg,
-                    "status": "accepted"
-                })
-            else:
-                signals.append({
-                    "symbol": symbol,
-                    "signal": signal_type,
-                    "confidence": final_confidence,
-                    "ml_confidence": ml_conf,
-                    "base_confidence": base_confidence,
-                    "status": "rejected"
-                })
-
+            signals['EURUSD'] = generate_eurusd_signal_with_score(eurusd_data)
+            logger.info(f"EURUSD signal: {signals['EURUSD']}")
         except Exception as e:
-            logging.error(f"❌ Error generating signal for {symbol}: {e}")
-    
-    return signals
+            logger.error(f"Error generating signal for EURUSD: {e}")
 
-#IRE_DID_THIS
+    # USDJPY
+    usdjpy_data = fetch_data('JPY=X')
+    if usdjpy_data is not None:
+        try:
+            signals['USDJPY'] = generate_usdjpy_signal_with_score(usdjpy_data)
+            logger.info(f"USDJPY signal: {signals['USDJPY']}")
+        except Exception as e:
+            logger.error(f"Error generating signal for USDJPY: {e}")
+
+    # GOLD
+    gold_data = fetch_data('GC=F')
+    if gold_data is not None:
+        try:
+            signals['GOLD'] = generate_gold_signal_with_score(gold_data)
+            logger.info(f"GOLD signal: {signals['GOLD']}")
+        except Exception as e:
+            logger.error(f"Error generating signal for GOLD: {e}")
+
+    return signals
