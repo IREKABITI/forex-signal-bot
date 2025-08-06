@@ -1,36 +1,68 @@
 # utils/helpers.py
 
-import datetime as dt
-import pytz
+import datetime
+import logging
+import requests
 
-def format_percentage(value):
-    """Format float as percentage string with 2 decimals."""
-    return f"{value:.2%}"
+# Hardcoded Telegram and Discord credentials
+TELEGRAM_TOKEN = "8123034561:AAFUmL-YVT2uybFNDdl4U9eKQtz2w1f1dPo"
+TELEGRAM_CHAT_ID = "5689209090"
+DISCORD_WEBHOOK_URL = "https://discord.com/api/webhooks/1402201260857233470/mwzakXPNjf6S_BPG4ZbK_1MmtivoO2AZKtzYFTrVtAm-68X0MW2HJ1naKCD33Hh2E8Zp"
 
-def get_current_utc_time():
-    """Return current UTC time."""
-    return dt.datetime.now(dt.timezone.utc)
+def is_trading_session_now(session_name: str) -> bool:
+    """
+    Checks if the current time is within a trading session.
+    session_name options: 'london', 'ny', 'asia', 'off'
+    Times are UTC.
+    """
+    now = datetime.datetime.utcnow().time()
 
-def get_local_time(timezone_str="US/Eastern"):
-    """Return local time in specified timezone."""
-    tz = pytz.timezone(timezone_str)
-    return dt.datetime.now(tz)
+    sessions = {
+        'london': (datetime.time(7, 0), datetime.time(16, 0)),
+        'ny': (datetime.time(12, 0), datetime.time(21, 0)),
+        'asia': (datetime.time(23, 0), datetime.time(8, 0)),
+    }
 
-def get_trading_session():
-    """Detect current trading session."""
-    utc_now = get_current_utc_time().time()
-    if dt.time(6, 0) <= utc_now < dt.time(14, 0):
-        return "London"
-    elif dt.time(13, 0) <= utc_now < dt.time(21, 0):
-        return "New York"
-    else:
-        return "Off-session"
+    if session_name not in sessions:
+        logging.warning(f"Unknown session name: {session_name}")
+        return False
 
-def is_trading_day():
-    """Check if today is a weekday (trading day)."""
-    return dt.datetime.utcnow().weekday() < 5
+    start, end = sessions[session_name]
+    if start < end:
+        return start <= now < end
+    else:  # crosses midnight
+        return now >= start or now < end
 
-def calculate_pips(open_price, close_price, pair="USDJPY"):
-    """Calculate pips for a forex trade."""
-    pip_factor = 100.0 if "JPY" in pair else 10000.0
-    return (close_price - open_price) * pip_factor
+def format_signal_message(signal_name, confidence, components_scores, emoji):
+    """
+    Formats the alert message for Telegram or Discord.
+    components_scores is a dict with keys like 'RSI', 'MACD', 'News', etc.
+    """
+    comp_str = ", ".join([f"{k}: {v}" for k, v in components_scores.items()])
+    message = f"{emoji} {signal_name} Signal ({confidence}/6 Confidence)\nDetails: {comp_str}"
+    return message
+
+def send_telegram_message(message: str):
+    url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
+    payload = {
+        'chat_id': TELEGRAM_CHAT_ID,
+        'text': message,
+        'parse_mode': 'Markdown',
+    }
+    try:
+        response = requests.post(url, data=payload)
+        response.raise_for_status()
+        logging.info("✅ Telegram message sent")
+    except Exception as e:
+        logging.error(f"❌ Failed to send Telegram message: {e}")
+
+def send_discord_message(message: str):
+    payload = {
+        "content": message
+    }
+    try:
+        response = requests.post(DISCORD_WEBHOOK_URL, json=payload)
+        response.raise_for_status()
+        logging.info("✅ Discord message sent")
+    except Exception as e:
+        logging.error(f"❌ Failed to send Discord message: {e}")
