@@ -1,41 +1,53 @@
-import requests
+import asyncio
+import aiohttp
 import logging
-import time
-from cachetools import TTLCache
 
-# Telegram and Discord credentials for alerting
-TELEGRAM_TOKEN = '8123034561:AAFUmL-YVT2uybFNDdl4U9eKQtz2w1f1dPo'
-TELEGRAM_CHAT_ID = '5689209090'
-DISCORD_WEBHOOK_URL = 'https://discord.com/api/webhooks/1402201260857233470/mwzakXPNjf6S_BPG4ZbK_1MmtivoO2AZKtzYFTrVtAm-68X0MW2HJ1naKCD33Hh2E8Zp'
+# Your Telegram and Discord credentials
+TELEGRAM_TOKEN = "8123034561:AAFUmL-YVT2uybFNDdl4U9eKQtz2w1f1dPo"
+TELEGRAM_CHAT_ID = "5689209090"
+DISCORD_WEBHOOK = "https://discord.com/api/webhooks/1402201260857233470/mwzakXPNjf6S_BPG4ZbK_1MmtivoO2AZKtzYFTrVtAm-68X0MW2HJ1naKCD33Hh2E8Zp"
 
-# Simple in-memory cache for news data, expires after 1800 seconds (30 mins)
-news_cache = TTLCache(maxsize=100, ttl=1800)
+NEWS_API_URL = "https://newsdata.io/api/1/news"
 
-def fetch_news(ticker):
-    """Fetch news related to ticker from NewsData.io or other API with caching."""
-    if ticker in news_cache:
-        logging.debug(f"News for {ticker} retrieved from cache")
-        return news_cache[ticker]
-
+async def fetch_news(ticker, session):
+    params = {
+        'apikey': 'your_newsdata_api_key_here',  # replace with your actual API key
+        'q': ticker,
+        'language': 'en',
+        'category': 'business,finance',
+        'page': 1
+    }
     try:
-        # Example: replace with your actual news API endpoint and params
-        api_key = 'YOUR_NEWSDATA_IO_API_KEY'
-        url = f'https://newsdata.io/api/1/news?apikey={api_key}&q={ticker}&language=en'
-        response = requests.get(url, timeout=10)
-        response.raise_for_status()
-        news_data = response.json()
-        # Process and filter news as needed
-        news_cache[ticker] = news_data
-        logging.info(f"Fetched news for {ticker}, total articles: {len(news_data.get('results', []))}")
-        return news_data
+        async with session.get(NEWS_API_URL, params=params) as response:
+            if response.status == 200:
+                data = await response.json()
+                return data.get('results', [])
+            else:
+                logging.error(f"Failed to fetch news for {ticker}, status: {response.status}")
+                return []
     except Exception as e:
-        logging.error(f"Error fetching news for {ticker}: {e}")
-        return None
+        logging.error(f"Exception fetching news for {ticker}: {e}")
+        return []
 
-def evaluate_news_impact(news_data):
-    """Analyze news articles and assign impact score: 0 (low), 1 (medium), 2 (high)."""
-    if not news_data or 'results' not in news_data:
-        return 0
+async def filter_high_impact_news(ticker):
+    async with aiohttp.ClientSession() as session:
+        news_items = await fetch_news(ticker, session)
+        high_impact_news = []
+        for item in news_items:
+            impact = item.get('impact', '').lower()
+            if impact in ('high', 'medium'):
+                high_impact_news.append({
+                    'title': item.get('title'),
+                    'link': item.get('link'),
+                    'impact': impact
+                })
+        return high_impact_news
 
-    impact_score = 0
-    for article in
+def send_alert(message):
+    # Placeholder for alert sending, implement Telegram and Discord alert functions here
+    pass
+
+# Example sync wrapper to use in main code (optional)
+def get_high_impact_news_sync(ticker):
+    return asyncio.run(filter_high_impact_news(ticker))
+
