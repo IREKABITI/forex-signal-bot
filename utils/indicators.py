@@ -1,42 +1,35 @@
-import pandas_ta as ta
+# ===============================
+# utils/indicators.py
+# ===============================
+import ta
+import pandas as pd
 
-def get_rsi_score(data, period=14):
-    if 'Close' not in data.columns or data.empty:
-        return 0
-    rsi_series = ta.rsi(data['Close'], length=period)
-    latest_rsi = rsi_series.iloc[-1]
-    if latest_rsi < 30:
-        return 1
-    elif latest_rsi > 70:
-        return -1
-    return 0
+def get_rsi_score(data):
+    rsi = ta.momentum.RSIIndicator(data['Close']).rsi()
+    last_rsi = rsi.iloc[-1]
+    if last_rsi < 30:
+        return 1  # Buy
+    elif last_rsi > 70:
+        return 1  # Sell
+    return 0  # Neutral
 
 def get_macd_score(data):
-    if 'Close' not in data.columns or data.empty:
-        return 0
-    macd = ta.macd(data['Close'])
-    macd_diff = macd['MACDh_12_26_9'].iloc[-1]
-    if macd_diff > 0:
-        return 1
-    elif macd_diff < 0:
-        return -1
+    macd = ta.trend.MACD(data['Close'])
+    hist = macd.macd_diff()
+    if hist.iloc[-1] > 0:
+        return 1  # Buy
+    elif hist.iloc[-1] < 0:
+        return 1  # Sell
     return 0
 
 def get_candle_score(data):
-    if data.empty or len(data) < 2:
-        return 0
     last = data.iloc[-1]
     if last['Close'] > last['Open']:
-        return 1
+        return 1  # Bullish candle
     elif last['Close'] < last['Open']:
-        return -1
+        return 1  # Bearish candle
     return 0
 
 def get_volatility_score(data):
-    if 'High' not in data.columns or 'Low' not in data.columns or 'Close' not in data.columns or data.empty:
-        return 0
-    atr = ta.atr(data['High'], data['Low'], data['Close'], length=14)
-    latest_atr = atr.iloc[-1]
-    if latest_atr > 0.005:
-        return 1
-    return 0
+    vol = data['Close'].rolling(window=14).std()
+    return 1 if vol.iloc[-1] > vol.mean() else 0
