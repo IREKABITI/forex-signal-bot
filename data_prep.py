@@ -1,38 +1,30 @@
+# data_prep.py
 import yfinance as yf
 import pandas as pd
 import logging
 
-logger = logging.getLogger(__name__)
-
-def fetch_price_data(ticker: str, interval: str = "1h", period: str = "7d") -> pd.DataFrame:
-    """
-    Fetch price data for a given ticker using yfinance.
-    Defaults to 1-hour candles for the past 7 days.
-    """
+def fetch_price_data(ticker, period='7d', interval='15m'):
     try:
-        logger.info(f"📊 Fetching price data for {ticker} ({interval}, {period})")
-        df = yf.download(ticker, interval=interval, period=period)
-        df.dropna(inplace=True)
-        return df
+        data = yf.download(ticker, period=period, interval=interval, auto_adjust=True)
+        if data.empty:
+            logging.warning(f"No data fetched for {ticker}")
+            return None
+        data.dropna(inplace=True)
+        return data
     except Exception as e:
-        logger.error(f"❌ Failed to fetch price data for {ticker}: {e}")
-        return pd.DataFrame()
+        logging.error(f"Error fetching data for {ticker}: {e}")
+        return None
 
-def prepare_ml_features(df: pd.DataFrame) -> pd.DataFrame:
-    """
-    Prepare ML-compatible feature set from price DataFrame.
-    Computes common indicators and normalizes.
-    """
+def prepare_features(data):
     try:
-        df = df.copy()
-        df["returns"] = df["Close"].pct_change()
-        df["sma_10"] = df["Close"].rolling(window=10).mean()
-        df["sma_50"] = df["Close"].rolling(window=50).mean()
-        df["volatility"] = df["Close"].rolling(window=10).std()
-        df["momentum"] = df["Close"] - df["Close"].shift(10)
-        df.dropna(inplace=True)
-        logger.info("✅ ML features prepared.")
-        return df
+        data = data.copy()
+        data['Return'] = data['Close'].pct_change()
+        data['SMA_20'] = data['Close'].rolling(window=20).mean()
+        data['SMA_50'] = data['Close'].rolling(window=50).mean()
+        data['EMA_20'] = data['Close'].ewm(span=20, adjust=False).mean()
+        data['EMA_50'] = data['Close'].ewm(span=50, adjust=False).mean()
+        data.dropna(inplace=True)
+        return data
     except Exception as e:
-        logger.error(f"❌ Failed to prepare ML features: {e}")
-        return pd.DataFrame()
+        logging.error(f"Error preparing features: {e}")
+        return None
