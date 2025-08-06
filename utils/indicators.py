@@ -23,7 +23,6 @@ def get_macd_score(data):
     return 0
 
 def get_candle_score(data):
-    # Example: simple bullish/bearish candle check last candle
     if data.empty or len(data) < 2:
         return 0
     last = data.iloc[-1]
@@ -34,10 +33,10 @@ def get_candle_score(data):
     return 0
 
 def get_volatility_score(data):
-    if 'Close' not in data.columns or data.empty:
+    if 'High' not in data.columns or 'Low' not in data.columns or 'Close' not in data.columns or data.empty:
         return 0
     atr = ta.atr(data['High'], data['Low'], data['Close'], length=14)
     latest_atr = atr.iloc[-1]
-    if latest_atr > 0.005:  # example threshold
+    if latest_atr > 0.005:
         return 1
     return 0
