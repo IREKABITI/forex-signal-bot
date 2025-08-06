@@ -1,84 +1,86 @@
-# portfolio_optimizer.py
-
 import numpy as np
 import pandas as pd
-import yfinance as yf
 import logging
 
-logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
-def fetch_price_data(tickers, period="3mo", interval="1d"):
-    price_data = {}
-    for ticker in tickers:
-        try:
-            df = yf.download(ticker, period=period, interval=interval, progress=False)
-            price_data[ticker] = df["Close"]
-        except Exception as e:
-            logging.warning(f"⚠️ Could not fetch data for {ticker}: {e}")
-    return pd.DataFrame(price_data)
+def calculate_portfolio_return(weights, returns):
+    return np.sum(weights * returns.mean()) * 252  # Annualized
 
-def mean_variance_optimizer(price_df):
-    returns = price_df.pct_change().dropna()
-    mean_returns = returns.mean()
-    cov_matrix = returns.cov()
-    
-    weights = np.linalg.inv(cov_matrix).dot(mean_returns)
-    weights /= np.sum(weights)
-    
-    portfolio = dict(zip(price_df.columns, np.round(weights, 3)))
-    logging.info(f"📊 Optimized Weights (Mean-Variance): {portfolio}")
-    return portfolio
+def calculate_portfolio_volatility(weights, cov_matrix):
+    return np.sqrt(np.dot(weights.T, np.dot(cov_matrix, weights))) * np.sqrt(252)
 
-def risk_parity_optimizer(price_df):
-    returns = price_df.pct_change().dropna()
-    vol = returns.std()
-    inv_vol = 1 / vol
-    weights = inv_vol / np.sum(inv_vol)
-    
-    portfolio = dict(zip(price_df.columns, np.round(weights, 3)))
-    logging.info(f"⚖️ Risk Parity Weights: {portfolio}")
-    return portfolio
+def calculate_sharpe_ratio(weights, returns, cov_matrix, risk_free_rate=0.01):
+    port_return = calculate_portfolio_return(weights, returns)
+    port_volatility = calculate_portfolio_volatility(weights, cov_matrix)
+    return (port_return - risk_free_rate) / port_volatility
 
-def monte_carlo_simulation(price_df, num_simulations=5000):
-    returns = price_df.pct_change().dropna()
-    mean_returns = returns.mean()
-    cov_matrix = returns.cov()
-    
-    results = np.zeros((3, num_simulations))
-    weights_record = []
-    
-    for i in range(num_simulations):
-        weights = np.random.random(len(price_df.columns))
-        weights /= np.sum(weights)
-        weights_record.append(weights)
-        
-        portfolio_return = np.sum(mean_returns * weights)
-        portfolio_vol = np.sqrt(weights.T @ cov_matrix @ weights)
-        sharpe_ratio = portfolio_return / portfolio_vol
-        
-        results[0,i] = portfolio_return
-        results[1,i] = portfolio_vol
-        results[2,i] = sharpe_ratio
-    
-    max_sharpe_idx = np.argmax(results[2])
-    best_weights = weights_record[max_sharpe_idx]
-    
-    portfolio = dict(zip(price_df.columns, np.round(best_weights, 3)))
-    logging.info(f"🎲 Monte Carlo Optimal Weights: {portfolio}")
-    return portfolio
+def optimize_portfolio(returns_df, method='sharpe'):
+    """
+    Optimize portfolio using specified method: 'sharpe' or 'risk_parity'.
+    """
+    try:
+        num_assets = len(returns_df.columns)
+        returns = returns_df.pct_change().dropna()
+        cov_matrix = returns.cov()
 
-def optimize_portfolio(tickers, method="mean_variance"):
-    df = fetch_price_data(tickers)
-    if df.empty:
-        logging.error("❌ No data for optimization.")
-        return {}
-    
-    if method == "mean_variance":
-        return mean_variance_optimizer(df)
-    elif method == "risk_parity":
-        return risk_parity_optimizer(df)
-    elif method == "monte_carlo":
-        return monte_carlo_simulation(df)
-    else:
-        logging.error(f"❌ Unknown optimization method: {method}")
-        return {}
+        if method == 'sharpe':
+            from scipy.optimize import minimize
+
+            def neg_sharpe(weights):
+                return -calculate_sharpe_ratio(weights, returns, cov_matrix)
+
+            constraints = ({'type': 'eq', 'fun': lambda x: np.sum(x) - 1})
+            bounds = tuple((0, 1) for _ in range(num_assets))
+            init_guess = num_assets * [1. / num_assets]
+
+            result = minimize(neg_sharpe, init_guess, method='SLSQP',
+                              bounds=bounds, constraints=constraints)
+
+            optimized_weights = result.x
+            logger.info("✅ Portfolio optimized using Sharpe ratio.")
+            return optimized_weights
+
+        elif method == 'risk_parity':
+            inv_vol = 1 / np.sqrt(np.diag(cov_matrix))
+            weights = inv_vol / np.sum(inv_vol)
+            logger.info("✅ Portfolio optimized using Risk Parity.")
+            return weights
+
+    except Exception as e:
+        logger.error(f"❌ Portfolio optimization failed: {e}")
+        return np.ones(num_assets) / num_assets  # Equal weight fallback
+
+def monte_carlo_simulation(returns_df, num_simulations=5000):
+    """
+    Run Monte Carlo simulation for portfolio returns.
+    """
+    try:
+        num_assets = len(returns_df.columns)
+        results = np.zeros((3, num_simulations))
+        returns = returns_df.pct_change().dropna()
+        cov_matrix = returns.cov()
+
+        for i in range(num_simulations):
+            weights = np.random.random(num_assets)
+            weights /= np.sum(weights)
+
+            port_return = calculate_portfolio_return(weights, returns)
+            port_volatility = calculate_portfolio_volatility(weights, cov_matrix)
+            sharpe_ratio = calculate_sharpe_ratio(weights, returns, cov_matrix)
+
+            results[0, i] = port_return
+            results[1, i] = port_volatility
+            results[2, i] = sharpe_ratio
+
+        max_sharpe_idx = np.argmax(results[2])
+        logger.info("✅ Monte Carlo simulation completed.")
+        return {
+            'returns': results[0],
+            'volatility': results[1],
+            'sharpe': results[2],
+            'optimal_index': max_sharpe_idx
+        }
+    except Exception as e:
+        logger.error(f"❌ Monte Carlo simulation failed: {e}")
+        return None
