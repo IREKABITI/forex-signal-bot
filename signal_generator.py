@@ -1,18 +1,22 @@
-from assets.eurusd_signal import generate_eurusd_signal_with_score
-from alert_manager import send_alerts
+# ===============================
+# signal_generator.py
+# ===============================
 import logging
+from assets.eurusd_signal import generate_eurusd_signal_with_score
+from assets.usdjpy_signal import generate_usdjpy_signal_with_score
+from assets.gold_signal import generate_gold_signal_with_score
 
-def generate_signal_with_ml():
-    signals = []
+def run_full_scan():
+    logging.info("🔍 Running full signal scan...")
     try:
-        eurusd = generate_eurusd_signal_with_score()
-        signals.append(("EURUSD", eurusd))
+        generate_eurusd_signal_with_score()
     except Exception as e:
-        logging.error(f"Error generating EURUSD signal: {e}")
-
-    # Add other assets signals here if needed
-
-    for symbol, data in signals:
-        msg = f"🟢 {symbol} Signal: {data['signal']} (Score: {data['total_score']})\nDetails: {data['scores']}"
-        logging.info(msg)
-        send_alerts(msg)
+        logging.error(f"Error generating signal for EURUSD: {e}")
+    try:
+        generate_usdjpy_signal_with_score()
+    except Exception as e:
+        logging.error(f"Error generating signal for USDJPY: {e}")
+    try:
+        generate_gold_signal_with_score()
+    except Exception as e:
+        logging.error(f"Error generating signal for GOLD: {e}")
